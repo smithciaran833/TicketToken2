@@ -1,8 +1,8 @@
-/**
- * login.js
- * TODO: Implement functionality
- */
+const express = require('express');
+const router = express.Router();
+const authController = require('../../../../controllers/authController');
+const { validateLogin } = require('../../../../middleware/validation');
 
-module.exports = {
-    // Add implementation here
-};
+router.post('/', validateLogin, authController.login);
+
+module.exports = router;

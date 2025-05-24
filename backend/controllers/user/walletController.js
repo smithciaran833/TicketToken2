@@ -1,7 +1,7 @@
 // controllers/walletController.js - Wallet API endpoints
 
-const WalletService = require('../services/walletService');
-const { generateToken } = require('../utils/jwtUtils');
+const WalletService = require('../../services/walletService');
+const { generateToken } = require('../../utils/jwtUtils');
 
 // @desc    Generate nonce for wallet authentication
 // @route   GET /api/wallet/nonce

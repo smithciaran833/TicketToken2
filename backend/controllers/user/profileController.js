@@ -1,9 +1,9 @@
 // controllers/profileController.js - Dedicated profile management functions
 
-const User = require('../models/User');
-const { validateEmail, validatePassword, validateWalletAddress, validateUrl } = require('../utils/validators');
-const { calculateProfileCompletion, isValidSocialHandle } = require('../utils/profileAnalytics');
-const { processProfileImage, deleteProfileImage } = require('../utils/imageProcessor');
+const User = require('../../models/User');
+const { validateEmail, validatePassword, validateWalletAddress, validateUrl } = require('../../utils/validators');
+const { calculateProfileCompletion, isValidSocialHandle } = require('../../utils/profileAnalytics');
+const { processProfileImage, deleteProfileImage } = require('../../utils/imageProcessor');
 const bcrypt = require('bcryptjs');
 
 // @desc    Get detailed user profile

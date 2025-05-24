@@ -1,8 +1,8 @@
-/**
- * register.js
- * TODO: Implement functionality
- */
+const express = require('express');
+const router = express.Router();
+const authController = require('../../../../controllers/authController');
+const { validateRegister } = require('../../../../middleware/validation');
 
-module.exports = {
-    // Add implementation here
-};
+router.post('/', validateRegister, authController.register);
+
+module.exports = router;
