@@ -214,6 +214,18 @@ const transactionSchema = new Schema({
       message: 'Invalid transaction hash format'
     }
   },
+  signature: {
+    type: String,
+    trim: true,
+    validate: {
+      validator: function(value) {
+        // Solana signature validation (88 characters, base58)
+        if (!value) return true;
+        return /^[1-9A-HJ-NP-Za-km-z]{87,88}$/.test(value);
+      },
+      message: 'Invalid transaction signature format'
+    }
+  },
   blockNumber: {
     type: Number,
     min: 0
@@ -354,6 +366,7 @@ const walletSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'User ID is required'],
+    unique: true,
     index: true
   },
   
@@ -366,7 +379,9 @@ const walletSchema = new Schema({
     validate: {
       validator: function(value) {
         // Support multiple blockchain address formats
-        return /^[A-Za-z0-9]{32,44}$/.test(value) || /^0x[a-fA-F0-9]{40}$/.test(value);
+        // Solana: 32-44 characters, base58
+        // Ethereum: 42 characters starting with 0x
+        return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value) || /^0x[a-fA-F0-9]{40}$/.test(value);
       },
       message: 'Invalid wallet address format'
     },
@@ -387,10 +402,24 @@ const walletSchema = new Schema({
     validate: {
       validator: function(value) {
         // Basic validation for public keys
-        return /^[A-Za-z0-9+/]{40,}={0,2}$/.test(value) || /^0x[a-fA-F0-9]{128}$/.test(value);
+        // Base58 for Solana or hex for Ethereum
+        return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value) || /^0x[a-fA-F0-9]{128}$/.test(value);
       },
       message: 'Invalid public key format'
     }
+  },
+  
+  // Encrypted private key storage
+  encryptedPrivateKey: {
+    type: String,
+    required: [true, 'Encrypted private key is required'],
+    select: false // Never include in queries by default
+  },
+  
+  encryptionIV: {
+    type: String,
+    required: [true, 'Encryption IV is required'],
+    select: false
   },
   
   // Connection status
@@ -489,6 +518,66 @@ const walletSchema = new Schema({
     },
     transactionHistory: [transactionSchema]
   },
+  
+  // Simple balance structure (legacy support)
+  balance: {
+    sol: {
+      type: Number,
+      default: 0,
+      min: [0, 'Balance cannot be negative']
+    },
+    tokens: [{
+      mint: {
+        type: String,
+        required: true,
+        validate: {
+          validator: function(value) {
+            return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+          },
+          message: 'Invalid token mint address'
+        }
+      },
+      symbol: String,
+      name: String,
+      decimals: Number,
+      balance: {
+        type: Number,
+        default: 0,
+        min: 0
+      },
+      uiAmount: {
+        type: Number,
+        default: 0
+      }
+    }]
+  },
+  
+  // NFTs array (simplified structure)
+  nfts: [{
+    mint: {
+      type: String,
+      required: true,
+      index: true
+    },
+    name: String,
+    symbol: String,
+    uri: String,
+    imageUrl: String,
+    attributes: [Schema.Types.Mixed],
+    collection: {
+      name: String,
+      family: String,
+      verified: Boolean
+    },
+    ticketId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Ticket'
+    },
+    eventId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Event'
+    }
+  }],
   
   // Security configuration
   security: {
@@ -968,6 +1057,11 @@ walletSchema.pre('save', async function(next) {
       this.updateConnectionMetrics();
     }
     
+    // Sync simple balance with complex balance structure
+    if (this.isModified('assets.balances')) {
+      this.syncBalances();
+    }
+    
     next();
   } catch (error) {
     next(error);
@@ -975,6 +1069,80 @@ walletSchema.pre('save', async function(next) {
 });
 
 // Instance methods
+
+// Method to encrypt sensitive data
+walletSchema.methods.encryptPrivateKey = function(privateKey) {
+  const algorithm = 'aes-256-gcm';
+  const key = crypto.scryptSync(process.env.WALLET_ENCRYPTION_KEY || 'default-encryption-key', 'salt', 32);
+  const iv = crypto.randomBytes(16);
+  
+  const cipher = crypto.createCipheriv(algorithm, key, iv);
+  
+  let encrypted = cipher.update(privateKey, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  
+  const authTag = cipher.getAuthTag();
+  
+  this.encryptedPrivateKey = encrypted + ':' + authTag.toString('hex');
+  this.encryptionIV = iv.toString('hex');
+  
+  return this;
+};
+
+// Method to decrypt private key (use with extreme caution)
+walletSchema.methods.decryptPrivateKey = function() {
+  if (!this.encryptedPrivateKey || !this.encryptionIV) {
+    throw new Error('No encrypted private key found');
+  }
+  
+  const algorithm = 'aes-256-gcm';
+  const key = crypto.scryptSync(process.env.WALLET_ENCRYPTION_KEY || 'default-encryption-key', 'salt', 32);
+  const iv = Buffer.from(this.encryptionIV, 'hex');
+  
+  const [encrypted, authTag] = this.encryptedPrivateKey.split(':');
+  
+  const decipher = crypto.createDecipheriv(algorithm, key, iv);
+  decipher.setAuthTag(Buffer.from(authTag, 'hex'));
+  
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  
+  return decrypted;
+};
+
+// Sync simple balance with complex balance
+walletSchema.methods.syncBalances = function() {
+  // Sync SOL balance
+  if (this.assets.balances.nativeToken.currency === 'SOL') {
+    this.balance.sol = this.assets.balances.nativeToken.amount;
+  }
+  
+  // Sync token balances
+  this.balance.tokens = this.assets.balances.tokens.map(token => ({
+    mint: token.tokenAddress,
+    symbol: token.symbol,
+    name: token.name,
+    decimals: token.decimals,
+    balance: token.amount,
+    uiAmount: token.amount / Math.pow(10, token.decimals)
+  }));
+  
+  // Sync NFTs
+  this.nfts = this.assets.nftTokens.map(nft => ({
+    mint: nft.tokenAddress,
+    name: nft.metadata.name,
+    symbol: nft.collectionInfo.symbol,
+    uri: nft.metadata.externalUrl,
+    imageUrl: nft.metadata.image,
+    attributes: nft.metadata.attributes,
+    collection: {
+      name: nft.collectionInfo.name,
+      family: nft.collectionInfo.name,
+      verified: nft.collectionInfo.verified
+    }
+  }));
+};
+
 walletSchema.methods.verifySignature = function(message, signature) {
   // This would integrate with blockchain-specific signature verification
   // For now, returning a basic validation structure
@@ -987,7 +1155,6 @@ walletSchema.methods.verifySignature = function(message, signature) {
   }
   
   // Blockchain-specific verification would go here
-  // This is a placeholder implementation
   const isValidFormat = this.validateSignatureFormat(signature);
   
   if (!isValidFormat) {
@@ -1025,6 +1192,11 @@ walletSchema.methods.updateBalance = async function(balanceData) {
   if (balanceData.nativeBalance !== undefined) {
     this.assets.balances.nativeToken.amount = balanceData.nativeBalance;
     this.assets.balances.nativeToken.lastUpdated = new Date();
+    
+    // Also update simple balance
+    if (this.assets.balances.nativeToken.currency === 'SOL') {
+      this.balance.sol = balanceData.nativeBalance;
+    }
   }
   
   // Update token balances
@@ -1054,6 +1226,9 @@ walletSchema.methods.updateBalance = async function(balanceData) {
   
   // Update portfolio value
   this.updatePortfolioValue();
+  
+  // Sync with simple balance structure
+  this.syncBalances();
   
   await this.save();
   return this;
@@ -1163,6 +1338,7 @@ walletSchema.methods.getTransactions = function(filters = {}) {
 walletSchema.methods.addTransaction = async function(transactionData) {
   const transaction = {
     transactionHash: transactionData.transactionHash,
+    signature: transactionData.signature,
     blockNumber: transactionData.blockNumber,
     blockHash: transactionData.blockHash,
     timestamp: transactionData.timestamp || new Date(),
@@ -1363,6 +1539,24 @@ walletSchema.methods.addNFT = async function(nftData) {
   };
   
   this.assets.nftTokens.push(nft);
+  
+  // Also add to simple NFT array
+  this.nfts.push({
+    mint: nftData.tokenAddress,
+    name: nftData.metadata?.name,
+    symbol: nftData.collectionInfo?.symbol,
+    uri: nftData.metadata?.externalUrl,
+    imageUrl: nftData.metadata?.image,
+    attributes: nftData.metadata?.attributes,
+    collection: {
+      name: nftData.collectionInfo?.name,
+      family: nftData.collectionInfo?.name,
+      verified: nftData.collectionInfo?.verified
+    },
+    ticketId: nftData.ticketId,
+    eventId: nftData.eventId
+  });
+  
   await this.save();
   
   return nft;
@@ -1372,6 +1566,10 @@ walletSchema.methods.removeNFT = async function(tokenAddress) {
   this.assets.nftTokens = this.assets.nftTokens.filter(
     nft => nft.tokenAddress !== tokenAddress
   );
+  
+  // Also remove from simple NFT array
+  this.nfts = this.nfts.filter(nft => nft.mint !== tokenAddress);
+  
   await this.save();
 };
 
@@ -1639,4 +1837,6 @@ walletSchema.query.needsSecurityCheck = function() {
   return this.where({ 'security.lastSecurityCheck': { $lt: sevenDaysAgo } });
 };
 
-module.exports = mongoose.model('Wallet', walletSchema);
+const Wallet = mongoose.model('Wallet', walletSchema);
+
+module.exports = Wallet;
