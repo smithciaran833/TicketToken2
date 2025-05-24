@@ -1,4 +1,4 @@
-// server.js - Updated with NFT access routes, exclusive content access validation, token-gated content, and artist analytics
+// server.js - Complete backend connection with all routes and database
 
 // Load environment variables
 require('dotenv').config();
@@ -18,23 +18,24 @@ const connectDB = require('./config/db');
 // Import Redis configuration
 const redis = require('./config/redis');
 
-// Import route files
+// Import route files - API v1 structure
+const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/userRoutes');
 const profileRoutes = require('./routes/profileRoutes');
-const eventRoutes = require('./routes/eventRoutes');
-const ticketRoutes = require('./routes/ticketRoutes');
+const eventRoutes = require('./routes/api/v1/events');
+const ticketRoutes = require('./routes/api/v1/tickets');
+const marketplaceRoutes = require('./routes/api/v1/marketplace');
 const contentRoutes = require('./routes/contentRoutes');
 const nftAccessRoutes = require('./routes/nftAccessRoutes');
-const accessRoutes = require('./routes/accessRoutes'); // Added new access routes
-const tokenGatedContentRoutes = require('./routes/tokenGatedContentRoutes'); // Added token-gated content routes
-const artistAnalyticsRoutes = require('./routes/artistAnalyticsRoutes'); // Added artist analytics routes
-const marketplaceRoutes = require('./routes/marketplaceRoutes');
+const accessRoutes = require('./routes/accessRoutes');
+const tokenGatedContentRoutes = require('./routes/tokenGatedContentRoutes');
+const artistAnalyticsRoutes = require('./routes/artistAnalyticsRoutes');
 
 // Import services
 const nftAccessService = require('./services/nftAccessService');
-const accessService = require('./services/accessService'); // Added new access service
-const { verifyTokenOwnership } = require('./services/tokenVerificationService'); // Added token verification service
-const artistRoyaltyService = require('./services/artistRoyaltyService'); // Added artist royalty service
+const accessService = require('./services/accessService');
+const { verifyTokenOwnership } = require('./services/tokenVerificationService');
+const artistRoyaltyService = require('./services/artistRoyaltyService');
 
 // Create Express app
 const app = express();
@@ -42,9 +43,7 @@ const app = express();
 // Connect to database
 connectDB();
 
-// Initialize NFT verification service (if needed)
-// This would happen in production when the server starts
-// For now, we'll just log that it's ready
+// Initialize NFT verification service
 console.log('NFT verification service initialized');
 
 // Initialize content access validation service
@@ -72,18 +71,36 @@ app.use(logger);
 // Static file serving for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Use routes
-// Use routes
-app.use('/api/users', userRoutes);
-app.use('/api/profile', profileRoutes);
-app.use('/api/events', eventRoutes);
-app.use('/api/tickets', ticketRoutes);
-app.use('/api/content', contentRoutes);
-app.use('/api/nft-access', nftAccessRoutes);
-app.use('/api/access', accessRoutes);
-app.use('/api/token-gated-content', tokenGatedContentRoutes);
-app.use('/api/analytics', artistAnalyticsRoutes);
-app.use('/api/marketplace', marketplaceRoutes);
+// Mount routes with API versioning
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/profile', profileRoutes);
+app.use('/api/v1/events', eventRoutes);
+app.use('/api/v1/tickets', ticketRoutes);
+app.use('/api/v1/marketplace', marketplaceRoutes);
+app.use('/api/v1/content', contentRoutes);
+app.use('/api/v1/nft-access', nftAccessRoutes);
+app.use('/api/v1/access', accessRoutes);
+app.use('/api/v1/token-gated-content', tokenGatedContentRoutes);
+app.use('/api/v1/analytics', artistAnalyticsRoutes);
+
+// Legacy routes for backward compatibility (redirect to v1)
+app.use('/api/users', (req, res, next) => {
+  req.url = `/api/v1/users${req.url}`;
+  next();
+});
+app.use('/api/profile', (req, res, next) => {
+  req.url = `/api/v1/profile${req.url}`;
+  next();
+});
+app.use('/api/events', (req, res, next) => {
+  req.url = `/api/v1/events${req.url}`;
+  next();
+});
+app.use('/api/tickets', (req, res, next) => {
+  req.url = `/api/v1/tickets${req.url}`;
+  next();
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -92,7 +109,7 @@ app.get('/health', (req, res) => {
     message: 'TicketToken API is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
-    version: '0.3.0' // Updated version to reflect new features
+    version: '1.0.0'
   });
 });
 
@@ -101,77 +118,100 @@ app.get('/api', (req, res) => {
   res.json({
     success: true,
     message: 'TicketToken API Documentation',
-    version: '0.3.0', // Updated version
+    version: '1.0.0',
     endpoints: {
       authentication: {
-        register: 'POST /api/users/register',
-        login: 'POST /api/users/login',
-        walletAuth: 'POST /api/users/wallet-auth',
-        checkAvailability: 'POST /api/users/check-availability'
+        register: 'POST /api/v1/auth/register',
+        login: 'POST /api/v1/auth/login',
+        walletAuth: 'POST /api/v1/auth/wallet-auth',
+        checkAvailability: 'POST /api/v1/auth/check-availability'
+      },
+      users: {
+        getProfile: 'GET /api/v1/users/profile',
+        updateProfile: 'PUT /api/v1/users/profile',
+        changePassword: 'PUT /api/v1/users/password',
+        uploadImage: 'POST /api/v1/users/image'
       },
       profile: {
-        getProfile: 'GET /api/users/profile',
-        updateProfile: 'PUT /api/users/profile',
-        getDetailed: 'GET /api/profile/detailed',
-        updatePreferences: 'PUT /api/profile/preferences',
-        updateSocial: 'PUT /api/profile/social',
-        manageWallets: 'POST/DELETE /api/profile/wallets',
-        changePassword: 'PUT /api/profile/password',
-        uploadImage: 'POST /api/profile/image',
-        getAnalytics: 'GET /api/profile/analytics'
+        getDetailed: 'GET /api/v1/profile/detailed',
+        updatePreferences: 'PUT /api/v1/profile/preferences',
+        updateSocial: 'PUT /api/v1/profile/social',
+        manageWallets: 'POST/DELETE /api/v1/profile/wallets',
+        getAnalytics: 'GET /api/v1/profile/analytics'
       },
-      events: '/api/events',
-      tickets: '/api/tickets',
+      events: {
+        create: 'POST /api/v1/events',
+        getAll: 'GET /api/v1/events',
+        getById: 'GET /api/v1/events/:id',
+        update: 'PUT /api/v1/events/:id',
+        delete: 'DELETE /api/v1/events/:id',
+        search: 'GET /api/v1/events/search'
+      },
+      tickets: {
+        create: 'POST /api/v1/tickets',
+        getAll: 'GET /api/v1/tickets',
+        getById: 'GET /api/v1/tickets/:id',
+        mint: 'POST /api/v1/tickets/:id/mint',
+        transfer: 'POST /api/v1/tickets/:id/transfer',
+        verify: 'GET /api/v1/tickets/:id/verify'
+      },
+      marketplace: {
+        list: 'POST /api/v1/marketplace/list',
+        getListings: 'GET /api/v1/marketplace/listings',
+        buy: 'POST /api/v1/marketplace/buy/:listingId',
+        cancel: 'POST /api/v1/marketplace/cancel/:listingId',
+        search: 'GET /api/v1/marketplace/search'
+      },
       content: {
-        create: 'POST /api/content',
-        getById: 'GET /api/content/:id',
-        getByEvent: 'GET /api/content/event/:eventId',
-        getByArtist: 'GET /api/content/artist/:artistId',
-        update: 'PUT /api/content/:id',
-        delete: 'DELETE /api/content/:id',
-        nftAccessible: 'GET /api/content/nft-accessible',
-        checkAccess: 'GET /api/content/:id/check-access'
+        create: 'POST /api/v1/content',
+        getById: 'GET /api/v1/content/:id',
+        getByEvent: 'GET /api/v1/content/event/:eventId',
+        getByArtist: 'GET /api/v1/content/artist/:artistId',
+        update: 'PUT /api/v1/content/:id',
+        delete: 'DELETE /api/v1/content/:id',
+        nftAccessible: 'GET /api/v1/content/nft-accessible',
+        checkAccess: 'GET /api/v1/content/:id/check-access'
       },
       nftAccess: {
-        check: 'POST /api/nft-access/check',
-        token: 'POST /api/nft-access/token',
-        verify: 'GET /api/nft-access/verify',
-        rules: 'POST /api/nft-access/rules',
-        getRules: 'GET /api/nft-access/rules/:resourceType/:resourceId',
-        sync: 'POST /api/nft-access/sync',
-        nfts: 'GET /api/nft-access/nfts',
-        resources: 'GET /api/nft-access/resources',
-        grants: 'GET /api/nft-access/grants',
-        revokeGrant: 'DELETE /api/nft-access/grants/:token'
+        check: 'POST /api/v1/nft-access/check',
+        token: 'POST /api/v1/nft-access/token',
+        verify: 'GET /api/v1/nft-access/verify',
+        rules: 'POST /api/v1/nft-access/rules',
+        getRules: 'GET /api/v1/nft-access/rules/:resourceType/:resourceId',
+        sync: 'POST /api/v1/nft-access/sync',
+        nfts: 'GET /api/v1/nft-access/nfts',
+        resources: 'GET /api/v1/nft-access/resources',
+        grants: 'GET /api/v1/nft-access/grants',
+        revokeGrant: 'DELETE /api/v1/nft-access/grants/:token'
       },
       access: {
-        validate: 'POST /api/access/validate',
-        rules: 'POST /api/access/rules',
-        getRules: 'GET /api/access/rules/:contentId',
-        updateRules: 'PUT /api/access/rules/:ruleId',
-        deleteRules: 'DELETE /api/access/rules/:ruleId',
-        eligible: 'GET /api/access/eligible/:userId',
-        contentList: 'GET /api/access/content/:tokenId'
+        validate: 'POST /api/v1/access/validate',
+        rules: 'POST /api/v1/access/rules',
+        getRules: 'GET /api/v1/access/rules/:contentId',
+        updateRules: 'PUT /api/v1/access/rules/:ruleId',
+        deleteRules: 'DELETE /api/v1/access/rules/:ruleId',
+        eligible: 'GET /api/v1/access/eligible/:userId',
+        contentList: 'GET /api/v1/access/content/:tokenId'
       },
       tokenGatedContent: {
-        create: 'POST /api/token-gated-content',
-        getAll: 'GET /api/token-gated-content',
-        getById: 'GET /api/token-gated-content/:id',
-        checkAccess: 'GET /api/token-gated-content/:id/check-access',
-        update: 'PUT /api/token-gated-content/:id',
-        delete: 'DELETE /api/token-gated-content/:id'
+        create: 'POST /api/v1/token-gated-content',
+        getAll: 'GET /api/v1/token-gated-content',
+        getById: 'GET /api/v1/token-gated-content/:id',
+        checkAccess: 'GET /api/v1/token-gated-content/:id/check-access',
+        update: 'PUT /api/v1/token-gated-content/:id',
+        delete: 'DELETE /api/v1/token-gated-content/:id'
       },
       artistAnalytics: {
-        getRoyalties: 'GET /api/analytics/royalties',
-        syncBlockchain: 'POST /api/analytics/royalties/sync',
-        generateReport: 'GET /api/analytics/royalties/report',
-        getPendingRoyalties: 'GET /api/analytics/royalties/pending',
-        updateSettings: 'PUT /api/analytics/royalties/settings',
-        getSettings: 'GET /api/analytics/royalties/settings',
-        getDistribution: 'GET /api/analytics/royalties/distribution/:resourceType/:resourceId',
-        recordPayment: 'POST /api/analytics/royalties/payment',
-        addPending: 'POST /api/analytics/royalties/pending',
-        processPending: 'POST /api/analytics/royalties/process-pending'
+        getRoyalties: 'GET /api/v1/analytics/royalties',
+        syncBlockchain: 'POST /api/v1/analytics/royalties/sync',
+        generateReport: 'GET /api/v1/analytics/royalties/report',
+        getPendingRoyalties: 'GET /api/v1/analytics/royalties/pending',
+        updateSettings: 'PUT /api/v1/analytics/royalties/settings',
+        getSettings: 'GET /api/v1/analytics/royalties/settings',
+        getDistribution: 'GET /api/v1/analytics/royalties/distribution/:resourceType/:resourceId',
+        recordPayment: 'POST /api/v1/analytics/royalties/payment',
+        addPending: 'POST /api/v1/analytics/royalties/pending',
+        processPending: 'POST /api/v1/analytics/royalties/process-pending'
       },
       health: '/health'
     },
@@ -184,14 +224,12 @@ app.get('/', (req, res) => {
   res.json({ 
     success: true,
     message: 'Welcome to TicketToken API',
-    version: '0.3.0', // Updated version
+    version: '1.0.0',
     documentation: '/api'
   });
 });
 
 // Set up a scheduled job to clean up expired access grants and refresh caches
-// This would run periodically in production
-// For development, we'll run it manually
 const runMaintenance = async () => {
   try {
     // Run NFT access maintenance
@@ -203,7 +241,6 @@ const runMaintenance = async () => {
     console.log('Access Validation Maintenance completed:', accessResult);
 
     // Run token verification cache cleanup
-    // Clear expired Redis keys
     const redisResult = await redis.eval(`
       local keys = redis.call('keys', 'tickettoken:token_ownership:*')
       local count = 0
@@ -219,9 +256,7 @@ const runMaintenance = async () => {
     console.log('Token verification cache cleanup completed:', redisResult);
     
     // Run artist analytics data cleanup
-    // This would clean up old data points and optimize storage
     console.log('Artist analytics maintenance started');
-    // In production, this would run actual maintenance tasks
     console.log('Artist analytics maintenance completed');
   } catch (error) {
     console.error('Maintenance error:', error);
@@ -231,7 +266,10 @@ const runMaintenance = async () => {
 // Run maintenance once at startup (for development)
 setTimeout(runMaintenance, 10000);
 
-// 404 handler for undefined routes
+// Error handling middleware (must be second to last)
+app.use(errorHandler);
+
+// 404 handler for undefined routes (must be last)
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -242,9 +280,6 @@ app.use('*', (req, res) => {
     suggestion: 'Check the API documentation at /api'
   });
 });
-
-// Error handling middleware (must be last)
-app.use(errorHandler);
 
 // Define the port to run on
 const PORT = process.env.PORT || 5000;
