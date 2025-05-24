@@ -1,0 +1,215 @@
+{
+  "name": "tickettoken-contracts",
+  "version": "1.0.0",
+  "description": "Solana smart contracts for TicketToken - NFT ticketing platform with marketplace, governance, staking, and content access control",
+  "keywords": [
+    "solana",
+    "anchor",
+    "nft",
+    "tickets",
+    "marketplace",
+    "governance",
+    "staking",
+    "blockchain"
+  ],
+  "author": {
+    "name": "TicketToken Team",
+    "email": "dev@tickettoken.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smithciaran833/TicketToken.git",
+    "directory": "contracts"
+  },
+  "homepage": "https://github.com/smithciaran833/TicketToken",
+  "bugs": {
+    "url": "https://github.com/smithciaran833/TicketToken/issues"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "scripts": {
+    "build": "anchor build",
+    "build:debug": "anchor build --debug",
+    "build:release": "anchor build --release",
+    "build:all": "npm run build:ticket-minter && npm run build:marketplace && npm run build:governance && npm run build:staking && npm run build:tickettoken",
+    "build:ticket-minter": "anchor build --program-name ticket_minter",
+    "build:marketplace": "anchor build --program-name marketplace",
+    "build:governance": "anchor build --program-name governance",
+    "build:staking": "anchor build --program-name staking",
+    "build:tickettoken": "anchor build --program-name tickettoken",
+    "test": "anchor test",
+    "test:local": "anchor test --provider.cluster localnet",
+    "test:devnet": "anchor test --provider.cluster devnet",
+    "test:mainnet": "anchor test --provider.cluster mainnet",
+    "test:unit": "npm run test:unit:all",
+    "test:unit:all": "npm run test:unit:ticket-minter && npm run test:unit:marketplace && npm run test:unit:governance && npm run test:unit:staking",
+    "test:unit:ticket-minter": "cargo test --manifest-path=programs/ticket-minter/Cargo.toml",
+    "test:unit:marketplace": "cargo test --manifest-path=programs/marketplace/Cargo.toml",
+    "test:unit:governance": "cargo test --manifest-path=programs/governance/Cargo.toml",
+    "test:unit:staking": "cargo test --manifest-path=programs/staking/Cargo.toml",
+    "test:integration": "anchor test --skip-local-validator",
+    "test:performance": "anchor test tests/ticket-minter-performance.test.ts",
+    "test:errors": "anchor test tests/ticket-minter-errors.test.ts",
+    "clean": "anchor clean && npm run clean:rust",
+    "clean:rust": "find . -name Cargo.toml -execdir cargo clean \\;",
+    "format": "npm run format:rust && npm run format:js",
+    "format:rust": "find . -name Cargo.toml -execdir cargo fmt \\;",
+    "format:js": "prettier --write \"**/*.{js,ts,json}\"",
+    "lint": "npm run lint:rust && npm run lint:js",
+    "lint:rust": "find . -name Cargo.toml -execdir cargo clippy -- -D warnings \\;",
+    "lint:js": "eslint \"**/*.{js,ts}\" --fix",
+    "deploy": "npm run deploy:devnet",
+    "deploy:localnet": "anchor deploy --provider.cluster localnet",
+    "deploy:devnet": "anchor deploy --provider.cluster devnet",
+    "deploy:mainnet": "anchor deploy --provider.cluster mainnet",
+    "deploy:program": "anchor deploy --program-name",
+    "deploy:ticket-minter": "anchor deploy --program-name ticket_minter --provider.cluster devnet",
+    "deploy:marketplace": "anchor deploy --program-name marketplace --provider.cluster devnet",
+    "deploy:governance": "anchor deploy --program-name governance --provider.cluster devnet",
+    "deploy:staking": "anchor deploy --program-name staking --provider.cluster devnet",
+    "deploy:tickettoken": "anchor deploy --program-name tickettoken --provider.cluster devnet",
+    "deploy:all": "npm run deploy:ticket-minter && npm run deploy:marketplace && npm run deploy:governance && npm run deploy:staking",
+    "upgrade": "anchor upgrade",
+    "upgrade:devnet": "anchor upgrade --provider.cluster devnet",
+    "upgrade:mainnet": "anchor upgrade --provider.cluster mainnet",
+    "verify": "anchor verify",
+    "verify:devnet": "anchor verify --provider.cluster devnet",
+    "verify:mainnet": "anchor verify --provider.cluster mainnet",
+    "idl": "anchor idl",
+    "idl:init": "anchor idl init",
+    "idl:upgrade": "anchor idl upgrade",
+    "idl:fetch": "anchor idl fetch",
+    "keys": "anchor keys",
+    "keys:list": "anchor keys list",
+    "keys:sync": "anchor keys sync",
+    "localnet": "solana-test-validator",
+    "localnet:reset": "solana-test-validator --reset",
+    "airdrop": "solana airdrop 2",
+    "airdrop:devnet": "solana airdrop 2 --url devnet",
+    "balance": "solana balance",
+    "balance:devnet": "solana balance --url devnet",
+    "setup:dev": "node scripts/setup-dev-enviroment.js",
+    "generate:keypair": "node scripts/generate-keypair.js",
+    "request:airdrop": "node scripts/request-airdrop.js",
+    "docs": "cargo doc --open --manifest-path=programs/ticket-minter/Cargo.toml",
+    "docs:all": "npm run docs:ticket-minter && npm run docs:marketplace && npm run docs:governance && npm run docs:staking",
+    "docs:ticket-minter": "cargo doc --manifest-path=programs/ticket-minter/Cargo.toml",
+    "docs:marketplace": "cargo doc --manifest-path=programs/marketplace/Cargo.toml",
+    "docs:governance": "cargo doc --manifest-path=programs/governance/Cargo.toml",
+    "docs:staking": "cargo doc --manifest-path=programs/staking/Cargo.toml",
+    "security:audit": "cargo audit --file programs/ticket-minter/Cargo.lock",
+    "security:audit:all": "find . -name Cargo.lock -execdir cargo audit \\;",
+    "benchmark": "anchor test --skip-local-validator --features benchmark"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.29.0",
+    "@solana/web3.js": "^1.91.0",
+    "@solana/spl-token": "^0.4.1",
+    "@metaplex-foundation/mpl-token-metadata": "^3.2.1",
+    "@metaplex-foundation/mpl-bubblegum": "^0.7.0",
+    "@metaplex-foundation/umi": "^0.9.2",
+    "@metaplex-foundation/umi-bundle-defaults": "^0.9.2",
+    "@metaplex-foundation/digital-asset-standard-api": "^1.1.0",
+    "bn.js": "^5.2.1",
+    "borsh": "^0.7.0",
+    "buffer": "^6.0.3",
+    "bs58": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/mocha": "^10.0.6",
+    "@types/chai": "^4.3.11",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "typescript": "^5.3.3",
+    "ts-mocha": "^10.0.0",
+    "ts-node": "^10.9.2",
+    "mocha": "^10.2.0",
+    "chai": "^4.4.1",
+    "chai-as-promised": "^7.1.1",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "prettier": "^3.2.4",
+    "nodemon": "^3.0.3",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.4.1",
+    "rimraf": "^5.0.5",
+    "cargo-audit": "^0.18.3"
+  },
+  "peerDependencies": {
+    "@coral-xyz/anchor": ">=0.28.0",
+    "@solana/web3.js": ">=1.87.0"
+  },
+  "config": {
+    "anchor": {
+      "cluster": "devnet",
+      "wallet": "~/.config/solana/id.json"
+    },
+    "solana": {
+      "rpc": {
+        "localnet": "http://127.0.0.1:8899",
+        "devnet": "https://api.devnet.solana.com",
+        "mainnet": "https://api.mainnet-beta.solana.com"
+      }
+    }
+  },
+  "anchor": {
+    "programs": {
+      "localnet": {
+        "ticket_minter": "YOUR_LOCAL_PROGRAM_ID_HERE",
+        "marketplace": "YOUR_LOCAL_MARKETPLACE_ID_HERE", 
+        "governance": "YOUR_LOCAL_GOVERNANCE_ID_HERE",
+        "staking": "YOUR_LOCAL_STAKING_ID_HERE",
+        "tickettoken": "YOUR_LOCAL_TICKETTOKEN_ID_HERE"
+      },
+      "devnet": {
+        "ticket_minter": "YOUR_DEVNET_PROGRAM_ID_HERE",
+        "marketplace": "YOUR_DEVNET_MARKETPLACE_ID_HERE",
+        "governance": "YOUR_DEVNET_GOVERNANCE_ID_HERE", 
+        "staking": "YOUR_DEVNET_STAKING_ID_HERE",
+        "tickettoken": "YOUR_DEVNET_TICKETTOKEN_ID_HERE"
+      },
+      "mainnet": {
+        "ticket_minter": "YOUR_MAINNET_PROGRAM_ID_HERE",
+        "marketplace": "YOUR_MAINNET_MARKETPLACE_ID_HERE",
+        "governance": "YOUR_MAINNET_GOVERNANCE_ID_HERE",
+        "staking": "YOUR_MAINNET_STAKING_ID_HERE", 
+        "tickettoken": "YOUR_MAINNET_TICKETTOKEN_ID_HERE"
+      }
+    }
+  },
+  "mocha": {
+    "timeout": 60000,
+    "require": "ts-node/register",
+    "extensions": ["ts"],
+    "spec": "tests/**/*.test.ts"
+  },
+  "eslintConfig": {
+    "extends": [
+      "@typescript-eslint/recommended",
+      "prettier"
+    ],
+    "parser": "@typescript-eslint/parser",
+    "plugins": [
+      "@typescript-eslint",
+      "prettier"
+    ],
+    "rules": {
+      "prettier/prettier": "error",
+      "@typescript-eslint/no-unused-vars": "error",
+      "@typescript-eslint/no-explicit-any": "warn"
+    }
+  },
+  "prettier": {
+    "semi": true,
+    "trailingComma": "es5",
+    "singleQuote": true,
+    "printWidth": 80,
+    "tabWidth": 2
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "tickettoken",
+  "version": "0.1.0",
+  "description": "NFT Ticketing Platform on Solana",
+  "scripts": {
+    "test-connection": "node blockchain/tests/test-connection.js",
+    "generate-examples": "node blockchain/tests/generate-example-metadata.js",
+    "test-wallet": "open blockchain/tests/wallet-connection-test.html"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.73.3",
+    "bs58": "^5.0.0",
+    "ed25519": "^0.0.5",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "buffer": "^6.0.3",
+    "serve": "^14.2.0"
+  }
+}

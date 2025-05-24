@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TicketToken Wallet Connection Test</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    
+    h1, h2 {
+      color: #2a2a72;
+    }
+    
+    .container {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      background-color: #f9f9f9;
+    }
+    
+    button {
+      background-color: #2a2a72;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    
+    button:hover {
+      background-color: #3a3a92;
+    }
+    
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    
+    #wallet-info {
+      margin-top: 20px;
+    }
+    
+    .wallet-button {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    
+    .wallet-icon {
+      width: 24px;
+      height: 24px;
+      margin-right: 10px;
+    }
+    
+    .status-connecting {
+      color: #ffa500;
+    }
+    
+    .status-connected {
+      color: #00aa00;
+    }
+    
+    .status-disconnected {
+      color: #888;
+    }
+    
+    .status-error {
+      color: #cc0000;
+    }
+    
+    #signature-result {
+      word-break: break-all;
+      font-family: monospace;
+      background-color: #eee;
+      padding: 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>TicketToken Wallet Connection Test</h1>
+  
+  <div class="container">
+    <h2>Wallet Connection</h2>
+    <p id="wallet-status" class="status-disconnected">Status: disconnected</p>
+    
+    <div>
+      <button id="connect-wallet">Connect Wallet</button>
+      <button id="disconnect-wallet">Disconnect</button>
+    </div>
+    
+    <div id="wallet-list">
+      <p>Checking for available wallets...</p>
+    </div>
+    
+    <div id="wallet-info">
+      <p>No wallet connected</p>
+    </div>
+  </div>
+  
+  <div class="container">
+    <h2>Message Signing</h2>
+    <p>Test signing a message with your connected wallet:</p>
+    
+    <div>
+      <button id="sign-message">Sign Message</button>
+    </div>
+    
+    <p id="signature-result"></p>
+  </div>
+  
+  <div class="container">
+    <h2>Installation Instructions</h2>
+    <p>If you don't have a Solana wallet installed, you can get one here:</p>
+    <ul>
+      <li><a href="https://phantom.app/" target="_blank">Phantom Wallet</a></li>
+      <li><a href="https://solflare.com/" target="_blank">Solflare Wallet</a></li>
+    </ul>
+  </div>
+  
+  <!-- Load dependencies -->
+  <script src="https://unpkg.com/@solana/web3.js@1.73.3/lib/index.iife.min.js"></script>
+  
+  <!-- Load TicketToken code -->
+  <script src="../config/constants.js"></script>
+  <script src="../config/connection.js"></script>
+  <script src="../wallet/wallet-utils.js"></script>
+  <script src="../wallet/wallet-adapter.js"></script>
+  <script src="test-wallet-connection.js"></script>
+</body>
+</html>

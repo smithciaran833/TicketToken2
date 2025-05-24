@@ -1,0 +1,378 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Base styles */
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply text-gray-900 bg-gray-50;
+  }
+  
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+}
+
+/* Component styles */
+@layer components {
+  /* Button variants */
+  .btn {
+    @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200;
+  }
+  
+  .btn-primary {
+    @apply btn text-white bg-primary-600 hover:bg-primary-700 focus:ring-primary-500;
+  }
+  
+  .btn-secondary {
+    @apply btn text-primary-700 bg-primary-100 hover:bg-primary-200 focus:ring-primary-500;
+  }
+  
+  .btn-white {
+    @apply btn text-gray-700 bg-white border-gray-300 hover:bg-gray-50 focus:ring-primary-500;
+  }
+  
+  .btn-danger {
+    @apply btn text-white bg-error-600 hover:bg-error-700 focus:ring-error-500;
+  }
+  
+  .btn-success {
+    @apply btn text-white bg-success-600 hover:bg-success-700 focus:ring-success-500;
+  }
+  
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+  
+  .btn-lg {
+    @apply px-6 py-3 text-base;
+  }
+  
+  /* Input styles */
+  .input {
+    @apply block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm;
+  }
+  
+  .input-error {
+    @apply border-error-300 text-error-900 placeholder-error-300 focus:ring-error-500 focus:border-error-500;
+  }
+  
+  /* Card styles */
+  .card {
+    @apply bg-white shadow rounded-lg p-6;
+  }
+  
+  .card-header {
+    @apply border-b border-gray-200 pb-4 mb-4;
+  }
+  
+  .card-title {
+    @apply text-lg font-medium text-gray-900;
+  }
+  
+  .card-subtitle {
+    @apply text-sm text-gray-500 mt-1;
+  }
+  
+  /* Table styles */
+  .table {
+    @apply min-w-full divide-y divide-gray-200;
+  }
+  
+  .table-head {
+    @apply bg-gray-50;
+  }
+  
+  .table-header {
+    @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+  }
+  
+  .table-cell {
+    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+  }
+  
+  .table-row {
+    @apply hover:bg-gray-50;
+  }
+  
+  /* Badge styles */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .badge-success {
+    @apply badge bg-success-100 text-success-800;
+  }
+  
+  .badge-warning {
+    @apply badge bg-warning-100 text-warning-800;
+  }
+  
+  .badge-error {
+    @apply badge bg-error-100 text-error-800;
+  }
+  
+  .badge-primary {
+    @apply badge bg-primary-100 text-primary-800;
+  }
+  
+  .badge-gray {
+    @apply badge bg-gray-100 text-gray-800;
+  }
+  
+  /* Status indicators */
+  .status-dot {
+    @apply h-2 w-2 rounded-full;
+  }
+  
+  .status-online {
+    @apply status-dot bg-success-400;
+  }
+  
+  .status-offline {
+    @apply status-dot bg-gray-400;
+  }
+  
+  .status-away {
+    @apply status-dot bg-warning-400;
+  }
+  
+  .status-busy {
+    @apply status-dot bg-error-400;
+  }
+  
+  /* Loading styles */
+  .loading-spinner {
+    @apply animate-spin h-5 w-5 text-primary-600;
+  }
+  
+  .loading-dots::after {
+    content: '';
+    animation: loading-dots 1.5s infinite;
+  }
+  
+  /* Navigation styles */
+  .nav-link {
+    @apply group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors;
+  }
+  
+  .nav-link-active {
+    @apply nav-link bg-primary-100 text-primary-900;
+  }
+  
+  .nav-link-inactive {
+    @apply nav-link text-gray-600 hover:bg-gray-50 hover:text-gray-900;
+  }
+  
+  /* Form styles */
+  .form-group {
+    @apply space-y-1;
+  }
+  
+  .form-label {
+    @apply block text-sm font-medium text-gray-700;
+  }
+  
+  .form-helper {
+    @apply text-sm text-gray-500;
+  }
+  
+  .form-error {
+    @apply text-sm text-error-600;
+  }
+  
+  /* Modal styles */
+  .modal-overlay {
+    @apply fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity;
+  }
+  
+  .modal-content {
+    @apply inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full;
+  }
+  
+  /* Dropdown styles */
+  .dropdown-menu {
+    @apply origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none;
+  }
+  
+  .dropdown-item {
+    @apply block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900;
+  }
+  
+  /* Pagination styles */
+  .pagination {
+    @apply flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6;
+  }
+  
+  .pagination-button {
+    @apply relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50;
+  }
+  
+  .pagination-button-active {
+    @apply pagination-button border-primary-500 bg-primary-50 text-primary-600;
+  }
+  
+  /* Chart styles */
+  .chart-container {
+    @apply w-full h-64 sm:h-80;
+  }
+  
+  /* Responsive utilities */
+  .container-responsive {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  /* Focus styles */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500;
+  }
+  
+  /* Transitions */
+  .transition-default {
+    @apply transition-all duration-200 ease-in-out;
+  }
+  
+  .transition-fast {
+    @apply transition-all duration-150 ease-in-out;
+  }
+  
+  .transition-slow {
+    @apply transition-all duration-300 ease-in-out;
+  }
+}
+
+/* Utility styles */
+@layer utilities {
+  /* Custom animations */
+  @keyframes loading-dots {
+    0%, 20% {
+      content: '.';
+    }
+    40% {
+      content: '..';
+    }
+    60% {
+      content: '...';
+    }
+    80%, 100% {
+      content: '';
+    }
+  }
+  
+  @keyframes pulse-soft {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+  
+  @keyframes slide-in-right {
+    0% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    100% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slide-out-right {
+    0% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+  
+  /* Custom text styles */
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Custom layout utilities */
+  .sidebar-width {
+    width: 16rem; /* 256px */
+  }
+  
+  .main-content-padding {
+    padding-left: 16rem; /* matches sidebar width */
+  }
+  
+  /* Dark mode utilities (if implementing dark mode) */
+  .dark-mode {
+    @apply bg-gray-900 text-gray-100;
+  }
+  
+  /* Print styles */
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+    
+    .print-only {
+      display: block !important;
+    }
+  }
+}
+
+/* Global overrides */
+/* React Hot Toast custom styles */
+.toast-success {
+  @apply bg-success-600 text-white;
+}
+
+.toast-error {
+  @apply bg-error-600 text-white;
+}
+
+.toast-loading {
+  @apply bg-primary-600 text-white;
+}
+
+/* Chart.js custom styles */
+.chartjs-tooltip {
+  @apply bg-gray-900 text-white rounded-lg shadow-lg;
+}
+
+/* Wallet adapter button overrides */
+.wallet-adapter-button {
+  @apply btn-primary;
+}
+
+.wallet-adapter-button:not([disabled]):hover {
+  @apply bg-primary-700;
+}
+
+/* Custom utility for hiding scrollbars */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}

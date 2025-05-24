@@ -1,0 +1,274 @@
+[toolchain]
+# Anchor CLI version
+anchor_version = "0.29.0"
+
+[features]
+# Enable deterministic builds for reproducible deployments
+seeds = false
+# Enable instruction introspection
+skip-lint = false
+# Enable resolution of non-anchor instructions
+resolution = true
+
+[programs.localnet]
+# Core ticket minting program
+ticket_minter = "TicketMinter11111111111111111111111111111111"
+# NFT marketplace program
+marketplace = "Marketplace11111111111111111111111111111111"
+# DAO governance program
+governance = "Governance11111111111111111111111111111111"
+# Staking rewards program
+staking = "Staking1111111111111111111111111111111111"
+# Enhanced ticket token program
+tickettoken = "TicketToken11111111111111111111111111111111"
+
+[programs.devnet]
+# Core ticket minting program
+ticket_minter = "REPLACE_WITH_DEVNET_TICKET_MINTER_PROGRAM_ID"
+# NFT marketplace program  
+marketplace = "REPLACE_WITH_DEVNET_MARKETPLACE_PROGRAM_ID"
+# DAO governance program
+governance = "REPLACE_WITH_DEVNET_GOVERNANCE_PROGRAM_ID"
+# Staking rewards program
+staking = "REPLACE_WITH_DEVNET_STAKING_PROGRAM_ID"
+# Enhanced ticket token program
+tickettoken = "REPLACE_WITH_DEVNET_TICKETTOKEN_PROGRAM_ID"
+
+[programs.mainnet]
+# Core ticket minting program
+ticket_minter = "REPLACE_WITH_MAINNET_TICKET_MINTER_PROGRAM_ID"
+# NFT marketplace program
+marketplace = "REPLACE_WITH_MAINNET_MARKETPLACE_PROGRAM_ID"  
+# DAO governance program
+governance = "REPLACE_WITH_MAINNET_GOVERNANCE_PROGRAM_ID"
+# Staking rewards program
+staking = "REPLACE_WITH_MAINNET_STAKING_PROGRAM_ID"
+# Enhanced ticket token program
+tickettoken = "REPLACE_WITH_MAINNET_TICKETTOKEN_PROGRAM_ID"
+
+[registry]
+# Anchor registry URL for program verification
+url = "https://api.anchor.so"
+
+[provider]
+# Default cluster for development
+cluster = "devnet"
+# Default wallet path
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+# Test script configuration
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[test]
+# Test startup configuration
+startup_wait = 5000
+# Test shutdown wait time
+shutdown_wait = 2000
+# Test timeout in milliseconds
+timeout = 600000
+# Skip building programs during testing (for faster iteration)
+skip_build = false
+# Skip deploying programs during testing
+skip_deploy = false
+# Skip starting local validator
+skip_local_validator = false
+# Use existing local validator instance
+detach = false
+# Validator configuration
+validator = { url = "http://127.0.0.1:8899", commitment = "confirmed" }
+
+[test.validator]
+# Local validator configuration for testing
+url = "http://127.0.0.1:8899"
+# Transaction commitment level
+commitment = "confirmed"
+# Preloaded accounts for testing
+[[test.validator.account]]
+address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+filename = "tests/fixtures/metaplex_token_metadata.so"
+
+[[test.validator.account]]
+address = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+filename = "tests/fixtures/spl_token.so"
+
+[[test.validator.account]]
+address = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+filename = "tests/fixtures/spl_associated_token_account.so"
+
+# Clone existing programs for testing
+[[test.validator.clone]]
+address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+
+[[test.validator.clone]]  
+address = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+
+[[test.validator.clone]]
+address = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+
+[[test.validator.clone]]
+address = "11111111111111111111111111111111"
+
+# Test genesis configuration
+[test.genesis]
+# Rent exemption threshold
+rent_exemption_threshold = 1.0
+# Cluster type for testing
+cluster_type = "development"
+
+# Workspace configuration
+[workspace]
+# Workspace members (all programs)
+members = [
+    "programs/ticket-minter",
+    "programs/marketplace", 
+    "programs/governance",
+    "programs/staking",
+    "programs/tickettoken"
+]
+
+# Program-specific build configurations
+[workspace.metadata.anchor]
+# Build configuration
+build = { verifiable = true }
+# Test configuration
+test = { genesis = "test.genesis" }
+
+# Build profiles for different environments
+[profile.debug]
+# Debug build configuration
+overflow-checks = true
+# Enable debug assertions
+debug-assertions = true
+# Optimization level (0 = no optimization, 3 = full optimization)
+opt-level = 0
+# Link time optimization
+lto = false
+# Code generation units
+codegen-units = 256
+# Panic strategy
+panic = "unwind"
+
+[profile.release]
+# Release build configuration
+overflow-checks = false
+debug-assertions = false
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+# Strip debug symbols
+strip = "symbols"
+
+[profile.test]
+# Test build configuration
+overflow-checks = true
+debug-assertions = true
+opt-level = 1
+lto = false
+codegen-units = 256
+panic = "unwind"
+
+# Development dependencies for all programs
+[dev-dependencies]
+# Anchor framework testing utilities
+anchor-client = "0.29.0"
+anchor-spl = "0.29.0"
+# Solana testing utilities
+solana-program-test = "1.17"
+solana-sdk = "1.17"
+# Token program testing
+spl-token = "4.0"
+spl-associated-token-account = "2.2"
+# Metaplex testing utilities
+mpl-token-metadata = "4.1"
+# Testing frameworks
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+assert_matches = "1.5"
+
+# Environment-specific configurations
+[env.localnet]
+# Local development cluster
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+rpc_url = "http://127.0.0.1:8899"
+ws_url = "ws://127.0.0.1:8900"
+
+[env.devnet]
+# Devnet cluster configuration
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+rpc_url = "https://api.devnet.solana.com"
+ws_url = "wss://api.devnet.solana.com"
+
+[env.mainnet]
+# Mainnet cluster configuration
+cluster = "mainnet-beta"
+wallet = "~/.config/solana/id.json"
+rpc_url = "https://api.mainnet-beta.solana.com"
+ws_url = "wss://api.mainnet-beta.solana.com"
+
+# Deployment configurations
+[deploy.devnet]
+# Devnet deployment settings
+program_ids = [
+    { name = "ticket_minter", address = "REPLACE_WITH_DEVNET_TICKET_MINTER_PROGRAM_ID" },
+    { name = "marketplace", address = "REPLACE_WITH_DEVNET_MARKETPLACE_PROGRAM_ID" },
+    { name = "governance", address = "REPLACE_WITH_DEVNET_GOVERNANCE_PROGRAM_ID" },
+    { name = "staking", address = "REPLACE_WITH_DEVNET_STAKING_PROGRAM_ID" },
+    { name = "tickettoken", address = "REPLACE_WITH_DEVNET_TICKETTOKEN_PROGRAM_ID" }
+]
+upgrade_authority = "~/.config/solana/id.json"
+
+[deploy.mainnet]
+# Mainnet deployment settings (production)
+program_ids = [
+    { name = "ticket_minter", address = "REPLACE_WITH_MAINNET_TICKET_MINTER_PROGRAM_ID" },
+    { name = "marketplace", address = "REPLACE_WITH_MAINNET_MARKETPLACE_PROGRAM_ID" },
+    { name = "governance", address = "REPLACE_WITH_MAINNET_GOVERNANCE_PROGRAM_ID" },
+    { name = "staking", address = "REPLACE_WITH_MAINNET_STAKING_PROGRAM_ID" },
+    { name = "tickettoken", address = "REPLACE_WITH_MAINNET_TICKETTOKEN_PROGRAM_ID" }
+]
+upgrade_authority = "~/.config/solana/mainnet-authority.json"
+
+# IDL (Interface Definition Language) configuration
+[idl]
+# Metadata for IDL generation
+metadata = { name = "TicketToken", version = "1.0.0", spec = "0.1.0" }
+# IDL generation settings
+generate = true
+# IDL output directory
+out_dir = "target/idl"
+
+# Verification settings for reproducible builds
+[verify]
+# Enable build verification
+enable = true
+# Docker image for verifiable builds
+docker_image = "projectserum/build:v0.27.0"
+# Bootstrap script for verification environment
+bootstrap = "curl https://release.solana.com/v1.17.0/install | sh"
+
+# Custom commands and aliases
+[alias]
+# Build all programs
+build-all = "build --all"
+# Test all programs
+test-all = "test --all" 
+# Deploy all programs to devnet
+deploy-devnet = "deploy --provider.cluster devnet --all"
+# Deploy all programs to mainnet
+deploy-mainnet = "deploy --provider.cluster mainnet --all"
+# Generate all IDLs
+idl-all = "idl build --all"
+# Clean all builds
+clean-all = "clean --all"
+
+# Security and audit configurations
+[security]
+# Enable security auditing
+audit = true
+# Audit configuration
+audit_config = { level = "high", exclude = [] }
+# Enable dependency vulnerability scanning
+vuln_scan = true

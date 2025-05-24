@@ -1,0 +1,54 @@
+[package]
+name = "tickettoken"
+version = "0.1.0"
+description = "Comprehensive Solana program for NFT ticket minting, marketplace, and content access control"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/smithciaran833/TicketToken"
+keywords = ["solana", "anchor", "nft", "tickets", "marketplace"]
+categories = ["cryptography::cryptocurrencies"]
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "tickettoken"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+testing = []
+anchor-debug = ["anchor-lang/anchor-debug"]
+
+[dependencies]
+anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
+anchor-spl = { version = "0.29.0", features = ["metadata"] }
+solana-program = "1.17"
+spl-token = { version = "4.0", features = ["no-entrypoint"] }
+spl-associated-token-account = { version = "2.2", features = ["no-entrypoint"] }
+mpl-token-metadata = { version = "4.1", features = ["no-entrypoint"] }
+borsh = "0.10"
+arrayref = "0.3"
+num-derive = "0.4"
+num-traits = "0.2"
+thiserror = "1.0"
+
+[dev-dependencies]
+solana-program-test = "1.17"
+solana-sdk = "1.17"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+assert_matches = "1.5"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1
