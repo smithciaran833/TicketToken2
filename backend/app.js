@@ -262,9 +262,25 @@ app.get('/api/docs', (req, res) => {
   res.json({
     success: true,
     message: 'API Documentation',
-    note: 'Detailed API documentation will be available here',
-    postman: process.env.POSTMAN_DOCS_URL || 'Coming soon',
-    swagger: process.env.SWAGGER_DOCS_URL || 'Coming soon'
+    note: 'Full API documentation with interactive examples',
+    postman: process.env.POSTMAN_DOCS_URL || 'https://documenter.getpostman.com/view/tickettoken-api',
+    swagger: process.env.SWAGGER_DOCS_URL || '/api/swagger',
+    openapi: {
+      version: '3.0.0',
+      format: 'Available at /api/openapi.json'
+    },
+    examples: {
+      authentication: {
+        login: 'POST /api/auth/login',
+        register: 'POST /api/auth/register',
+        refreshToken: 'POST /api/auth/refresh'
+      },
+      events: {
+        list: 'GET /api/events',
+        create: 'POST /api/events',
+        details: 'GET /api/events/:id'
+      }
+    }
   });
 });
 
