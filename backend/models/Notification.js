@@ -195,8 +195,18 @@ const notificationSchema = new Schema({
     type: String,
     required: [true, 'Notification type is required'],
     enum: [
+      // System types
       'system', 'marketing', 'event', 'social', 'payment', 'security', 
-      'reminder', 'update', 'promotion', 'alert', 'news', 'personalized'
+      'reminder', 'update', 'promotion', 'alert', 'news', 'personalized',
+      // Specific event types
+      'ticket_purchase', 'ticket_transfer', 'ticket_sale',
+      'event_reminder', 'event_update', 'event_cancelled',
+      'payment_received', 'payment_sent', 'payment_failed',
+      'marketplace_offer', 'marketplace_bid', 'marketplace_sale',
+      'verification_success', 'verification_failed',
+      'content_published', 'content_liked', 'content_shared',
+      'artist_announcement', 'promoter_message',
+      'system_update', 'security_alert', 'account_activity'
     ],
     index: true
   },
@@ -226,6 +236,19 @@ const notificationSchema = new Schema({
   data: {
     type: Schema.Types.Mixed,
     default: {}
+  },
+  
+  // For backward compatibility with simpler notifications
+  relatedEntity: {
+    entityType: {
+      type: String,
+      enum: ['event', 'ticket', 'user', 'payment', 'content', 'marketplace_listing'],
+      index: true
+    },
+    entityId: {
+      type: Schema.Types.ObjectId,
+      index: true
+    }
   },
   
   actionUrl: {
@@ -278,6 +301,16 @@ const notificationSchema = new Schema({
     type: Date
   },
   
+  // Legacy field support
+  readStatus: {
+    isRead: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    readAt: Date
+  },
+  
   expiresAt: {
     type: Date,
     index: true,
@@ -327,9 +360,31 @@ const notificationSchema = new Schema({
   status: {
     type: String,
     required: [true, 'Notification status is required'],
-    enum: ['pending', 'sent', 'delivered', 'failed', 'expired'],
+    enum: ['pending', 'sent', 'delivered', 'failed', 'expired', 'cancelled'],
     default: 'pending',
     index: true
+  },
+  
+  // Legacy delivery status support
+  deliveryStatus: {
+    email: {
+      sent: { type: Boolean, default: false },
+      sentAt: Date,
+      error: String,
+      messageId: String
+    },
+    sms: {
+      sent: { type: Boolean, default: false },
+      sentAt: Date,
+      error: String,
+      messageId: String
+    },
+    push: {
+      sent: { type: Boolean, default: false },
+      sentAt: Date,
+      error: String,
+      tokens: [String]
+    }
   },
   
   // Interaction tracking
@@ -426,11 +481,35 @@ const notificationSchema = new Schema({
     }
   },
   
+  // Legacy support fields
+  channels: [{
+    type: String,
+    enum: ['in_app', 'email', 'sms', 'push']
+  }],
+  
+  retryCount: {
+    type: Number,
+    default: 0,
+    max: 3
+  },
+  
+  metadata: {
+    ipAddress: String,
+    userAgent: String,
+    platform: {
+      type: String,
+      enum: ['web', 'mobile', 'api']
+    }
+  },
+  
   // Admin and management
   createdBy: {
     type: Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'Creator is required']
+    required: function() {
+      // Only required for non-system notifications
+      return !this.type || this.type !== 'system';
+    }
   },
   
   tags: [{
@@ -478,6 +557,8 @@ notificationSchema.index({ priority: 1, scheduledFor: 1 });
 notificationSchema.index({ 'deliveryChannels.channel': 1, 'deliveryChannels.status': 1 });
 notificationSchema.index({ createdAt: -1 });
 notificationSchema.index({ tags: 1 });
+notificationSchema.index({ userId: 1, 'readStatus.isRead': 1 });
+notificationSchema.index({ 'relatedEntity.entityType': 1, 'relatedEntity.entityId': 1 });
 
 // Text search index
 notificationSchema.index({ 
@@ -501,7 +582,7 @@ notificationSchema.index({
 
 // Virtual fields
 notificationSchema.virtual('isRead').get(function() {
-  return !!this.readAt;
+  return !!this.readAt || (this.readStatus && this.readStatus.isRead);
 });
 
 notificationSchema.virtual('isExpired').get(function() {
@@ -509,11 +590,62 @@ notificationSchema.virtual('isExpired').get(function() {
 });
 
 notificationSchema.virtual('isDelivered').get(function() {
-  return this.deliveryChannels.some(channel => channel.status === 'delivered');
+  if (this.deliveryChannels && this.deliveryChannels.length > 0) {
+    return this.deliveryChannels.some(channel => channel.status === 'delivered');
+  }
+  // Legacy support
+  return this.status === 'delivered';
 });
 
 notificationSchema.virtual('totalInteractions').get(function() {
-  return this.interactions.length;
+  return this.interactions ? this.interactions.length : 0;
+});
+
+// Virtual for time since creation (from first artifact)
+notificationSchema.virtual('timeAgo').get(function() {
+  const now = new Date();
+  const diff = now - this.createdAt;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  if (minutes > 0) return `${minutes}m ago`;
+  return 'just now';
+});
+
+// Virtual for delivery summary (from first artifact)
+notificationSchema.virtual('deliverySummary').get(function() {
+  const summary = {
+    total: 0,
+    delivered: 0,
+    failed: 0,
+    pending: 0
+  };
+  
+  // Support both new and legacy formats
+  if (this.deliveryChannels && this.deliveryChannels.length > 0) {
+    summary.total = this.deliveryChannels.length;
+    this.deliveryChannels.forEach(channel => {
+      if (channel.status === 'delivered') summary.delivered++;
+      else if (['failed', 'bounced', 'spam'].includes(channel.status)) summary.failed++;
+      else summary.pending++;
+    });
+  } else if (this.channels) {
+    summary.total = this.channels.length;
+    this.channels.forEach(channel => {
+      if (this.deliveryStatus[channel]?.sent) {
+        summary.delivered++;
+      } else if (this.deliveryStatus[channel]?.error) {
+        summary.failed++;
+      } else {
+        summary.pending++;
+      }
+    });
+  }
+  
+  return summary;
 });
 
 // Populate virtual references
@@ -534,7 +666,7 @@ notificationSchema.virtual('creator', {
 // Pre-save hooks
 notificationSchema.pre('save', async function(next) {
   try {
-    // Set expiration if not provided
+    // Set default expiration if not provided
     this.setDefaultExpiration();
     
     // Update analytics if interactions changed
@@ -543,7 +675,25 @@ notificationSchema.pre('save', async function(next) {
     }
     
     // Process tags
-    this.tags = [...new Set(this.tags.map(tag => tag.toLowerCase()))];
+    if (this.tags) {
+      this.tags = [...new Set(this.tags.map(tag => tag.toLowerCase()))];
+    }
+    
+    // Sync readStatus with readAt for backward compatibility
+    if (this.readAt && !this.readStatus.isRead) {
+      this.readStatus.isRead = true;
+      this.readStatus.readAt = this.readAt;
+    } else if (this.readStatus.isRead && !this.readAt) {
+      this.readAt = this.readStatus.readAt || new Date();
+    }
+    
+    // Convert legacy channels to deliveryChannels if needed
+    if (this.channels && this.channels.length > 0 && (!this.deliveryChannels || this.deliveryChannels.length === 0)) {
+      this.deliveryChannels = this.channels.map(channel => ({
+        channel: channel,
+        status: 'pending'
+      }));
+    }
     
     next();
   } catch (error) {
@@ -567,21 +717,216 @@ notificationSchema.methods.setDefaultExpiration = function() {
   }
 };
 
+// Enhanced markAsRead method (combines both versions)
 notificationSchema.methods.markAsRead = async function(readAt = null) {
-  if (this.readAt) return this; // Already read
+  if (this.readAt || (this.readStatus && this.readStatus.isRead)) return this; // Already read
   
-  this.readAt = readAt || new Date();
+  const readTime = readAt || new Date();
+  this.readAt = readTime;
+  
+  // Update legacy readStatus
+  if (!this.readStatus) {
+    this.readStatus = {};
+  }
+  this.readStatus.isRead = true;
+  this.readStatus.readAt = readTime;
   
   // Add read interaction
+  if (!this.interactions) {
+    this.interactions = [];
+  }
   this.interactions.push({
     type: 'opened',
-    timestamp: this.readAt
+    timestamp: readTime
   });
   
   this.updateAnalytics();
   await this.save();
   
   return this;
+};
+
+// Instance method to mark as sent (from first artifact)
+notificationSchema.methods.markAsSent = async function(channel, messageId) {
+  this.status = 'sent';
+  
+  // Update new format
+  if (this.deliveryChannels) {
+    const deliveryChannel = this.deliveryChannels.find(ch => ch.channel === channel);
+    if (deliveryChannel) {
+      deliveryChannel.status = 'sent';
+      deliveryChannel.sentAt = new Date();
+      if (messageId) {
+        deliveryChannel.providerId = messageId;
+      }
+    }
+  }
+  
+  // Update legacy format
+  if (this.deliveryStatus && this.deliveryStatus[channel]) {
+    this.deliveryStatus[channel].sent = true;
+    this.deliveryStatus[channel].sentAt = new Date();
+    if (messageId) {
+      this.deliveryStatus[channel].messageId = messageId;
+    }
+  }
+  
+  await this.save();
+  return this;
+};
+
+// Instance method to mark as failed (from first artifact)
+notificationSchema.methods.markAsFailed = async function(channel, error) {
+  // Update new format
+  if (this.deliveryChannels) {
+    const deliveryChannel = this.deliveryChannels.find(ch => ch.channel === channel);
+    if (deliveryChannel) {
+      deliveryChannel.status = 'failed';
+      deliveryChannel.failedAt = new Date();
+      deliveryChannel.errorMessage = error.message || error;
+      deliveryChannel.retryCount++;
+    }
+  }
+  
+  // Update legacy format
+  if (this.deliveryStatus && this.deliveryStatus[channel]) {
+    this.deliveryStatus[channel].sent = false;
+    this.deliveryStatus[channel].error = error.message || error;
+  }
+  
+  // Check if all channels failed
+  const allFailed = this.deliveryChannels 
+    ? this.deliveryChannels.every(ch => ['failed', 'bounced', 'spam'].includes(ch.status))
+    : this.channels && this.channels.every(ch => this.deliveryStatus[ch] && this.deliveryStatus[ch].error);
+  
+  if (allFailed) {
+    this.status = 'failed';
+  }
+  
+  this.retryCount++;
+  await this.save();
+  return this;
+};
+
+// Enhanced getFormattedMessage method with template support
+notificationSchema.methods.getFormattedMessage = function(channel) {
+  const templates = {
+    email: {
+      ticket_purchase: {
+        subject: 'Ticket Purchase Confirmation - {{eventName}}',
+        template: process.env.EMAIL_TEMPLATE_TICKET_PURCHASE || 'ticket-purchase-email',
+        data: ['eventName', 'ticketCount', 'totalAmount', 'purchaseId']
+      },
+      event_reminder: {
+        subject: 'Event Reminder: {{eventName}} is coming up!',
+        template: process.env.EMAIL_TEMPLATE_EVENT_REMINDER || 'event-reminder-email',
+        data: ['eventName', 'eventDate', 'venueName', 'ticketCount']
+      },
+      payment_received: {
+        subject: 'Payment Received - ${{amount}}',
+        template: process.env.EMAIL_TEMPLATE_PAYMENT_RECEIVED || 'payment-received-email',
+        data: ['amount', 'paymentMethod', 'transactionId']
+      },
+      marketplace_offer: {
+        subject: 'New Offer Received for Your Listing',
+        template: process.env.EMAIL_TEMPLATE_MARKETPLACE_OFFER || 'marketplace-offer-email',
+        data: ['offerAmount', 'eventName', 'offerFrom']
+      },
+      security_alert: {
+        subject: 'Security Alert: New Login Detected',
+        template: process.env.EMAIL_TEMPLATE_SECURITY_ALERT || 'security-alert-email',
+        data: ['location', 'device', 'ipAddress', 'timestamp']
+      }
+    },
+    sms: {
+      ticket_purchase: 'TicketToken: Your {{ticketCount}} ticket(s) for {{eventName}} have been confirmed. Order #{{orderId}}',
+      event_reminder: 'TicketToken: {{eventName}} is tomorrow at {{eventTime}}. Don\'t forget your tickets!',
+      verification_success: 'TicketToken: Your ticket has been verified. Enjoy {{eventName}}!',
+      payment_received: 'TicketToken: Payment of ${{amount}} received. Transaction ID: {{transactionId}}',
+      security_alert: 'TicketToken Security Alert: New login from {{location}}. Not you? Contact support immediately.'
+    },
+    push: {
+      ticket_purchase: 'Purchase confirmed for {{eventName}}',
+      marketplace_offer: 'New offer received: ${{offerAmount}}',
+      security_alert: 'New login detected from {{location}}',
+      event_reminder: '{{eventName}} starts in {{timeUntil}}',
+      payment_received: 'Payment received: ${{amount}}'
+    },
+    webhook: {
+      // Webhook payloads
+      _format: 'json',
+      _url: process.env.WEBHOOK_NOTIFICATION_URL
+    }
+  };
+  
+  const template = templates[channel]?.[this.type];
+  if (!template) return this.message;
+  
+  if (channel === 'email') {
+    return {
+      subject: this.replaceVariables(template.subject),
+      template: template.template,
+      data: this.extractTemplateData(template.data)
+    };
+  }
+  
+  if (channel === 'webhook') {
+    return {
+      url: template._url || process.env.WEBHOOK_NOTIFICATION_URL,
+      payload: {
+        type: this.type,
+        userId: this.userId,
+        title: this.title,
+        message: this.message,
+        data: this.data,
+        timestamp: new Date()
+      }
+    };
+  }
+  
+  return this.replaceVariables(template);
+};
+
+// Helper method to replace template variables
+notificationSchema.methods.replaceVariables = function(template) {
+  let result = template;
+  
+  // Support both Map and object data
+  if (this.data instanceof Map) {
+    this.data.forEach((value, key) => {
+      result = result.replace(new RegExp(`{{${key}}}`, 'g'), value);
+    });
+  } else if (typeof this.data === 'object') {
+    Object.keys(this.data).forEach(key => {
+      result = result.replace(new RegExp(`{{${key}}}`, 'g'), this.data[key]);
+    });
+  }
+  
+  // Also check personalizedData
+  if (this.personalizedData && typeof this.personalizedData === 'object') {
+    Object.keys(this.personalizedData).forEach(key => {
+      result = result.replace(new RegExp(`{{${key}}}`, 'g'), this.personalizedData[key]);
+    });
+  }
+  
+  return result;
+};
+
+// Helper method to extract template data
+notificationSchema.methods.extractTemplateData = function(fields) {
+  const data = {};
+  
+  fields.forEach(field => {
+    if (this.data instanceof Map && this.data.has(field)) {
+      data[field] = this.data.get(field);
+    } else if (this.data && typeof this.data === 'object' && this.data[field]) {
+      data[field] = this.data[field];
+    } else if (this.personalizedData && this.personalizedData[field]) {
+      data[field] = this.personalizedData[field];
+    }
+  });
+  
+  return data;
 };
 
 notificationSchema.methods.trackInteraction = async function(interactionData) {
@@ -595,11 +940,19 @@ notificationSchema.methods.trackInteraction = async function(interactionData) {
     additionalData: interactionData.additionalData
   };
   
+  if (!this.interactions) {
+    this.interactions = [];
+  }
   this.interactions.push(interaction);
   
   // Mark as read if it's an open interaction
   if (interactionData.type === 'opened' && !this.readAt) {
     this.readAt = interaction.timestamp;
+    if (!this.readStatus) {
+      this.readStatus = {};
+    }
+    this.readStatus.isRead = true;
+    this.readStatus.readAt = interaction.timestamp;
   }
   
   this.updateAnalytics();
@@ -609,8 +962,7 @@ notificationSchema.methods.trackInteraction = async function(interactionData) {
 };
 
 notificationSchema.methods.updateAnalytics = function() {
-  const totalInteractions = this.interactions.length;
-  if (totalInteractions === 0) return;
+  if (!this.interactions || this.interactions.length === 0) return;
   
   // Calculate interaction rates
   const openInteractions = this.interactions.filter(i => i.type === 'opened').length;
@@ -625,9 +977,11 @@ notificationSchema.methods.updateAnalytics = function() {
   this.analytics.conversionRate = Math.round((conversionInteractions / recipients) * 100 * 100) / 100;
   
   // Calculate delivery rate
-  const deliveredChannels = this.deliveryChannels.filter(c => c.status === 'delivered').length;
-  const totalChannels = this.deliveryChannels.length || 1;
-  this.analytics.deliveryRate = Math.round((deliveredChannels / totalChannels) * 100 * 100) / 100;
+  if (this.deliveryChannels && this.deliveryChannels.length > 0) {
+    const deliveredChannels = this.deliveryChannels.filter(c => c.status === 'delivered').length;
+    const totalChannels = this.deliveryChannels.length;
+    this.analytics.deliveryRate = Math.round((deliveredChannels / totalChannels) * 100 * 100) / 100;
+  }
   
   this.analytics.lastCalculated = new Date();
 };
@@ -668,12 +1022,14 @@ notificationSchema.methods.send = async function() {
   this.sentAt = new Date();
   
   // Set delivery channels to sent
-  this.deliveryChannels.forEach(channel => {
-    if (channel.status === 'pending') {
-      channel.status = 'sent';
-      channel.sentAt = new Date();
-    }
-  });
+  if (this.deliveryChannels) {
+    this.deliveryChannels.forEach(channel => {
+      if (channel.status === 'pending') {
+        channel.status = 'sent';
+        channel.sentAt = new Date();
+      }
+    });
+  }
   
   await this.save();
   return this;
@@ -715,6 +1071,8 @@ notificationSchema.methods.updateDeliveryStatus = async function(channelId, stat
 };
 
 notificationSchema.methods.updateOverallStatus = function() {
+  if (!this.deliveryChannels || this.deliveryChannels.length === 0) return;
+  
   const statuses = this.deliveryChannels.map(c => c.status);
   
   if (statuses.every(s => s === 'delivered')) {
@@ -769,6 +1127,144 @@ notificationSchema.methods.restore = async function() {
 };
 
 // Static methods
+
+// Enhanced createNotification method (from first artifact)
+notificationSchema.statics.createNotification = async function(data) {
+  const notification = new this(data);
+  
+  // Set default channels based on type and user preferences
+  if (!notification.channels || notification.channels.length === 0) {
+    notification.channels = ['in_app'];
+    
+    // Add email for important notifications
+    if (['ticket_purchase', 'payment_received', 'security_alert'].includes(notification.type)) {
+      notification.channels.push('email');
+    }
+  }
+  
+  // Convert channels to deliveryChannels format
+  if (!notification.deliveryChannels || notification.deliveryChannels.length === 0) {
+    notification.deliveryChannels = notification.channels.map(channel => ({
+      channel: channel,
+      status: 'pending'
+    }));
+  }
+  
+  return notification.save();
+};
+
+// Static method to mark multiple as read (from first artifact)
+notificationSchema.statics.markMultipleAsRead = async function(userId, notificationIds) {
+  return this.updateMany(
+    {
+      _id: { $in: notificationIds },
+      userId: userId,
+      $or: [
+        { readAt: { $exists: false } },
+        { 'readStatus.isRead': false }
+      ]
+    },
+    {
+      $set: {
+        readAt: new Date(),
+        'readStatus.isRead': true,
+        'readStatus.readAt': new Date()
+      }
+    }
+  );
+};
+
+// Static method to get unread count (enhanced)
+notificationSchema.statics.getUnreadCount = async function(userId) {
+  return this.countDocuments({
+    userId,
+    $or: [
+      { readAt: { $exists: false } },
+      { 'readStatus.isRead': false }
+    ],
+    status: { $in: ['sent', 'delivered'] },
+    $or: [
+      { expiresAt: null },
+      { expiresAt: { $gt: new Date() } }
+    ],
+    isDeleted: false
+  });
+};
+
+// Enhanced getUserNotifications method (from first artifact)
+notificationSchema.statics.getUserNotifications = async function(userId, options = {}) {
+  const {
+    page = 1,
+    limit = 20,
+    type = null,
+    unreadOnly = false,
+    priority = null,
+    category = null
+  } = options;
+  
+  const query = { userId, isDeleted: false };
+  
+  if (type) query.type = type;
+  if (category) query.category = category;
+  if (unreadOnly) {
+    query.$or = [
+      { readAt: { $exists: false } },
+      { 'readStatus.isRead': false }
+    ];
+  }
+  if (priority) query.priority = priority;
+  
+  // Exclude expired notifications
+  query.$and = [
+    {
+      $or: [
+        { expiresAt: null },
+        { expiresAt: { $gt: new Date() } }
+      ]
+    }
+  ];
+  
+  const skip = (page - 1) * limit;
+  
+  const [notifications, total] = await Promise.all([
+    this.find(query)
+      .sort({ priority: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('relatedEntity.entityId')
+      .populate('createdBy', 'username displayName'),
+    this.countDocuments(query)
+  ]);
+  
+  return {
+    notifications,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit)
+    }
+  };
+};
+
+// Static method to clean up old notifications (from first artifact)
+notificationSchema.statics.cleanupOldNotifications = async function(daysToKeep = 30) {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+  
+  return this.deleteMany({
+    $or: [
+      { createdAt: { $lt: cutoffDate } },
+      { expiresAt: { $lt: new Date() } }
+    ],
+    $or: [
+      { readAt: { $exists: true } },
+      { 'readStatus.isRead': true }
+    ],
+    isDeleted: false
+  });
+};
+
 notificationSchema.statics.findPendingNotifications = function(limit = 100) {
   const now = new Date();
   
@@ -810,7 +1306,10 @@ notificationSchema.statics.findByUser = function(userId, filters = {}) {
 notificationSchema.statics.findUnreadByUser = function(userId, limit = 50) {
   return this.find({
     userId: userId,
-    readAt: { $exists: false },
+    $or: [
+      { readAt: { $exists: false } },
+      { 'readStatus.isRead': false }
+    ],
     status: { $in: ['sent', 'delivered'] },
     $or: [
       { expiresAt: { $exists: false } },
@@ -924,7 +1423,12 @@ notificationSchema.query.sent = function() {
 };
 
 notificationSchema.query.unread = function() {
-  return this.where({ readAt: { $exists: false } });
+  return this.where({ 
+    $or: [
+      { readAt: { $exists: false } },
+      { 'readStatus.isRead': false }
+    ]
+  });
 };
 
 notificationSchema.query.byType = function(type) {
@@ -957,4 +1461,6 @@ notificationSchema.query.expired = function() {
   });
 };
 
-module.exports = mongoose.model('Notification', notificationSchema);
+const Notification = mongoose.model('Notification', notificationSchema);
+
+module.exports = Notification;
